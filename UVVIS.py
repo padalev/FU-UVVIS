@@ -8,16 +8,18 @@ import glob
 #todo:
 #running averages
 #irradiance
-#setaverages
 #setintegrationtime
+#use less functions
+#instead use mode
 
 class Measurement:
   def __init__(self, integrationtime = 4000, averages = 1):
     self.integrationtime = integrationtime
-    self.averages = averages
+    self.setaverages(averages)
     # state variables to know in case integration time or averages changes
     self.darkset = False
     self.lightset = False
+    self.spectra = []
     # start up spectrometer
     try:
       self.spec = sb.Spectrometer.from_serial_number()
@@ -32,6 +34,10 @@ class Measurement:
 
   def setaverages(self,n):
     self.averages = n
+    # fill spectra safe
+    self.spectra = []
+    for i in range(self.averages):
+      spectra.append(self.light)
     print('Averages set to: ' + str(n))
 
   def setintegrationtime(self,t=None,auto=False):
@@ -113,7 +119,7 @@ class Measurement:
     self.ax0.set_ylim(-1000, 67000)
     self.ax0.set_ylabel('Intensity (count)')
     self.ax0.set_title(name)
-    self.ax1.set_ylim(-0.1, 2.5)
+    self.ax1.set_ylim(-0.1, 1.5)
     self.ax1.set_ylabel('Absorbance')
     self.ax1.set_xlabel('Wavelength (nm)')
     # now start the animation and connect action events
@@ -141,12 +147,15 @@ class Measurement:
 
   def animate(self,i):
     # new empty spectrum
-    spectrum = np.zeros(len(self.wavelengths))
+    #spectrum = np.zeros(len(self.wavelengths))
     # collect spectra
-    for k in range(self.averages):
-      spectrum = spectrum + self.spec.intensities()
+    #for k in range(self.averages):
+    #  spectrum = spectrum + self.spec.intensities()
     # calculate average
-    self.currentspec = spectrum/self.averages
+    self.spectra[:-1] = self.spectra[1:]
+    self.spectra[-1] = self.spec.intensities()
+    self.currentspec = np.mean(np.array(spectra), axis=0)
+    #self.currentspec = spectrum/self.averages
     if self.darkset:
       # if dark spectrum is set: subtract that
       self.line[0].set_data(self.wavelengths, self.currentspec-self.dark)
