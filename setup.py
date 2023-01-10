@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(name='FU-UVVIS',
       version='0.1',
@@ -6,5 +6,5 @@ setup(name='FU-UVVIS',
       author='Ruben Nitsche',
       author_email='mail@rubennitsche.eu',
       url='https://github.com/padalev/FU-UVVIS',
-      packages=['UVVIS'],
+      packages=find_packages('UVVIS'),
      )

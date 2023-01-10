@@ -40,6 +40,8 @@ class Measurement:
     self.spectra = []
     for i in range(self.averages):
       self.spectra.append(self.light)
+    self.darkset = False
+    self.lightset = False
     print('Averages set to: ' + str(n))
 
   def setintegrationtime(self,t=None,auto=False):
@@ -48,13 +50,34 @@ class Measurement:
       print('Integration time set to: ' + str(t))
     elif auto:
       self.integrationtime = 4000
-      self.spec.integration_time_micros(self.integrationtime)
-      time.sleep(self.integrationtime*1e-6 + 1)
-      #todo
-      print('do auto int time')
+      for i in range(5):
+        print('Current Integration Time: '+str(self.integrationtime))
+        self.spec.integration_time_micros(self.integrationtime)
+        time.sleep(self.integrationtime*1e-6 + 1)
+        self.currentspec = self.spec.intensities()
+        print('Maximum: '+str(np.max(self.currentspec)))
+        self.integrationtime = int(self.integrationtime*55000/np.max(self.currentspec))
+        self.integrationtime = np.max([self.integrationtime, 4000])
     else:
       #todo
       print('do manual int time')
+    self.darkset = False
+    self.lightset = False
+
+  def scope(self):
+    # generate a plot to set the light spectrum with just the scope
+    self.fig, (self.ax0) = plt.subplots(1,1)
+    # generate empty line for live plotting
+    self.line0, = self.ax0.plot([], [], lw=1)
+    self.line = [self.line0]
+    # aesthetics ...
+    self.ax0.set_xlim(min(self.wavelengths),max(self.wavelengths))
+    self.ax0.set_ylim(-1000, 67000)
+    self.ax0.set_ylabel('Intensity (count)')
+    self.ax0.set_xlabel('Wavelength (nm)')
+    self.ax0.set_title('SCOPE')
+    self.anim = ani.FuncAnimation(self.fig, self.animate)
+    plt.show()
 
   def setlight(self):
     self.mode = 'l'
@@ -193,9 +216,9 @@ class Measurement:
     return self.line,
 
 
-m = Measurement(4000,30)
-m.setlight()
-m.setdark()
-windows = ['1_30nm','2_15nm','3_5nm']
-for window in windows:
-  m.absorbance(window)
+#m = Measurement(4000,30)
+#m.setlight()
+#m.setdark()
+#windows = ['1_30nm','2_15nm','3_5nm']
+#for window in windows:
+#  m.absorbance(window)
