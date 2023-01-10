@@ -75,7 +75,11 @@ class Measurement:
     print('irradiance')
 
   def absorbance(self,name):
+    previous = glob.glob(self.name+'*')
     self.fig, (self.ax0, self.ax1) = plt.subplots(2,1,sharex=True)
+    for measurement in previous:
+      m = np.genfromtxt(measurement)
+      self.ax1.plot(m[:,0], m[:,1], lw=1, alpha=0.3, color='black')
     self.line0, = self.ax0.plot([], [], lw=1)
     self.line1, = self.ax1.plot([], [], lw=1)
     self.line = [self.line0, self.line1]
