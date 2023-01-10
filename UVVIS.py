@@ -6,16 +6,11 @@ import time
 import glob
 
 #todo:
-#running averages
 #irradiance
 #setintegrationtime
-#use less functions
-#instead use mode
 
 class Measurement:
   def __init__(self, integrationtime = 4000, averages = 1):
-    self.integrationtime = integrationtime
-    self.setaverages(averages)
     # state variables to know in case integration time or averages changes
     self.darkset = False
     self.lightset = False
@@ -26,10 +21,17 @@ class Measurement:
       self.spec.integration_time_micros(self.integrationtime)
       self.wavelengths = self.spec.wavelengths()
       self.currentspec = self.spec.intensities()
-      self.dark = self.spec.intensities()
-      self.light = self.spec.intensities()
+      self.dark = self.currentspec
+      self.light = self.currentspec
     except:
       print('Error starting spectrometer')
+      # generate some fake data anyways
+      self.wavelengths = np.linspace(200,1000,1024)
+      self.currentspec = np.random.normal(5000,50,1024)
+      self.dark = self.currentspec
+      self.light = self.currentspec
+    self.setintegrationtime(integrationtime)
+    self.setaverages(averages)
     self.mode = ''
 
   def setaverages(self,n):
@@ -37,7 +39,7 @@ class Measurement:
     # fill spectra safe
     self.spectra = []
     for i in range(self.averages):
-      spectra.append(self.light)
+      self.spectra.append(self.light)
     print('Averages set to: ' + str(n))
 
   def setintegrationtime(self,t=None,auto=False):
@@ -45,6 +47,9 @@ class Measurement:
       self.integrationtime = t
       print('Integration time set to: ' + str(t))
     elif auto:
+      self.integrationtime = 4000
+      self.spec.integration_time_micros(self.integrationtime)
+      time.sleep(self.integrationtime*1e-6 + 1)
       #todo
       print('do auto int time')
     else:
@@ -52,6 +57,7 @@ class Measurement:
       print('do manual int time')
 
   def setlight(self):
+    self.mode = 'l'
     # generate a plot to set the light spectrum with just the scope
     self.fig, (self.ax0) = plt.subplots(1,1)
     # generate empty line for live plotting
@@ -64,17 +70,12 @@ class Measurement:
     self.ax0.set_xlabel('Wavelength (nm)')
     self.ax0.set_title('LIGHT')
     self.anim = ani.FuncAnimation(self.fig, self.animate)
-    self.cid = self.fig.canvas.mpl_connect('button_press_event', self.savelight)
-    self.cid = self.fig.canvas.mpl_connect('key_press_event', self.savelight)
+    self.cid = self.fig.canvas.mpl_connect('button_press_event', self.save)
+    self.cid = self.fig.canvas.mpl_connect('key_press_event', self.save)
     plt.show()
 
-  def savelight(self,i):
-    self.light = self.currentspec
-    plt.close('all')
-    self.lightset = True
-    print('light set')
-
   def setdark(self):
+    self.mode = 'd'
     self.fig, (self.ax0) = plt.subplots(1,1)
     self.line0, = self.ax0.plot([], [], lw=1)
     self.line = [self.line0]
@@ -85,22 +86,24 @@ class Measurement:
     self.ax0.set_title('DARK')
     # now start the animation and connect action events
     self.anim = ani.FuncAnimation(self.fig, self.animate)
-    self.cid = self.fig.canvas.mpl_connect('button_press_event', self.savedark)
-    self.cid = self.fig.canvas.mpl_connect('key_press_event', self.savedark)
+    self.cid = self.fig.canvas.mpl_connect('button_press_event', self.save)
+    self.cid = self.fig.canvas.mpl_connect('key_press_event', self.save)
     plt.show()
-
-  def savedark(self,i):
-    # set dark, close plot
-    self.dark = self.currentspec
-    plt.close('all')
-    self.darkset = True
-    print('dark set')
 
   def irradiance(self):
     # todo
+    self.mode = 'i'
     print('irradiance')
 
   def absorbance(self,name):
+    # check if dark and light are set, else warn and break execution
+    if not self.darkset:
+      print('Dark Spectrum is not set')
+      return
+    if not self.lightset:
+      print('Light Spectrum is not set')
+      return
+    self.mode = 'a'
     # set name for correct filename
     self.name = name
     # generate new figure with two axis for scope and absorbance
@@ -124,24 +127,35 @@ class Measurement:
     self.ax1.set_xlabel('Wavelength (nm)')
     # now start the animation and connect action events
     self.anim = ani.FuncAnimation(self.fig, self.animate)
-    self.cid = self.fig.canvas.mpl_connect('button_press_event', self.saveabsorbance)
-    self.cid = self.fig.canvas.mpl_connect('key_press_event', self.saveabsorbance)
+    self.cid = self.fig.canvas.mpl_connect('button_press_event', self.save)
+    self.cid = self.fig.canvas.mpl_connect('key_press_event', self.save)
     # set absorbance mode so that animation function knows what to plot
-    self.mode = 'a'
     plt.show()
 
-  def saveabsorbance(self,i):
-    # get time of measurement
-    t = int(time.time())
-    # get measurement number using previous files
-    counter = len(glob.glob(self.name+'*'))
-    # save important information as header
-    header = 'Integration Time:\t'+str(self.integrationtime)+'\n'
-    header = header+'Averages:\t'+str(self.averages)+'\n'
-    header = header+'Unix-Time:\t'+str(t)+'\n\n'
-    header = header+'Wavelength (nm)\tAbsorbance\tScope (counts)\tLight (counts)\tDark (counts)'
-    # save all kinds of spectra to file and close plot, reset mode
-    np.savetxt(self.name+'_'+str(counter)+'.txt', np.transpose([self.wavelengths,np.log10((self.light-self.dark)/(self.currentspec-self.dark)),self.currentspec,self.light,self.dark]),header=header)
+  def save(self,i):
+    if self.mode == 'd':
+      # set dark
+      self.dark = self.currentspec
+      self.darkset = True
+      print('dark set')
+    elif self.mode == 'l':
+      # set light
+      self.light = self.currentspec
+      self.lightset = True
+      print('light set')
+    elif self.mode == 'a':
+      # get time of measurement
+      t = int(time.time())
+      # get measurement number using previous files
+      counter = len(glob.glob(self.name+'*'))
+      # save important information as header
+      header = 'Integration Time:\t'+str(self.integrationtime)+'\n'
+      header = header+'Averages:\t'+str(self.averages)+'\n'
+      header = header+'Unix-Time:\t'+str(t)+'\n\n'
+      header = header+'Wavelength (nm)\tAbsorbance\tScope (counts)\tLight (counts)\tDark (counts)'
+      # save all kinds of spectra to file
+      np.savetxt(self.name+'_'+str(counter)+'.txt', np.transpose([self.wavelengths,np.log10((self.light-self.dark)/(self.currentspec-self.dark)),self.currentspec,self.light,self.dark]),header=header)
+    #close plot, reset mode
     plt.close('all')
     self.mode = ''
 
@@ -153,8 +167,16 @@ class Measurement:
     #  spectrum = spectrum + self.spec.intensities()
     # calculate average
     self.spectra[:-1] = self.spectra[1:]
-    self.spectra[-1] = self.spec.intensities()
-    self.currentspec = np.mean(np.array(spectra), axis=0)
+    try:
+      self.spectra[-1] = self.spec.intensities()
+    except:
+      if self.mode == 'd':
+        self.spectra[-1] = np.random.normal(5000,500,1024)
+      elif self.mode == 'l':
+        self.spectra[-1] = np.random.normal(40000,500,1024)
+      elif self.mode == 'a':
+        self.spectra[-1] = np.random.normal(20000,500,1024)
+    self.currentspec = np.mean(np.array(self.spectra), axis=0)
     #self.currentspec = spectrum/self.averages
     if self.darkset:
       # if dark spectrum is set: subtract that
@@ -169,6 +191,7 @@ class Measurement:
       # todo: irradiance plot
       pass
     return self.line,
+
 
 m = Measurement(4000,30)
 m.setlight()
