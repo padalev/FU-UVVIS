@@ -16,7 +16,7 @@ pip install .
 ## Usage
 ### Initialization
 ```
-m = Measurement( integrationtime = 4000, averages = 30)
+m = UVVIS.Measurement( integrationtime = 4000, averages = 30)
 ```
 
 ### Scope
