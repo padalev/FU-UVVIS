@@ -26,10 +26,18 @@ class Measurement:
     except:
       print('Error starting spectrometer')
       # generate some fake data anyways
-      self.wavelengths = np.linspace(200,1000,1024)
-      self.currentspec = np.random.normal(5000,50,1024)
+      self.wavelengths = np.linspace(200,1000,3648)
+      self.currentspec = np.random.normal(5000,50,3648)
       self.dark = self.currentspec
       self.light = self.currentspec
+    try:
+      self.calibration = np.genfromtxt('flame_calibration.txt')
+    except:
+      print('Error: could not load calibration data')
+    try:
+      self.am0 = np.genfromtxt('AM0.tsv')
+    except:
+      print('Error: could not load AM0 data')
     self.setintegrationtime(integrationtime)
     self.setaverages(averages)
     self.mode = ''
@@ -113,10 +121,41 @@ class Measurement:
     self.cid = self.fig.canvas.mpl_connect('key_press_event', self.save)
     plt.show()
 
-  def irradiance(self):
-    # todo
+  def irradiance(self,name):
+    # check if dark is set, else warn and break execution
+    if not self.darkset:
+      print('Dark Spectrum is not set')
+      return
     self.mode = 'i'
-    print('irradiance')
+    # set name for correct filename
+    self.name = name
+    # generate new figure with two axis for scope and absorbance
+    self.fig, (self.ax0, self.ax1) = plt.subplots(2,1,sharex=True)
+    #plot am0
+    self.ax1.plot(self.am0[:,0]*1000, self.am0[:,1]/1000, lw=1, alpha=0.6, color='orange')
+    # look for previously saved spectra and plot them into the absorbance graph
+    previous = glob.glob(self.name+'*')
+    for measurement in previous:
+      m = np.genfromtxt(measurement)
+      self.ax1.plot(m[:,0], m[:,1], lw=1, alpha=0.3, color='black')
+    # plot empty lines for live plotting
+    self.line0, = self.ax0.plot([], [], lw=1)
+    self.line1, = self.ax1.plot([], [], lw=1)
+    self.line = [self.line0, self.line1]
+    # some aesthetics ...
+    self.ax0.set_xlim(min(self.wavelengths),max(self.wavelengths))
+    self.ax0.set_ylim(-1000, 67000)
+    self.ax0.set_ylabel('Intensity (count)')
+    self.ax0.set_title(name)
+    self.ax1.set_ylim(-0.3, 2.3)
+    self.ax1.set_ylabel('Irradiance (W/m$^2$/nm)')
+    self.ax1.set_xlabel('Wavelength (nm)')
+    # now start the animation and connect action events
+    self.anim = ani.FuncAnimation(self.fig, self.animate)
+    self.cid = self.fig.canvas.mpl_connect('button_press_event', self.save)
+    self.cid = self.fig.canvas.mpl_connect('key_press_event', self.save)
+    # set absorbance mode so that animation function knows what to plot
+    plt.show()
 
   def absorbance(self,name):
     # check if dark and light are set, else warn and break execution
@@ -178,6 +217,18 @@ class Measurement:
       header = header+'Wavelength (nm)\tAbsorbance\tScope (counts)\tLight (counts)\tDark (counts)'
       # save all kinds of spectra to file
       np.savetxt(self.name+'_'+str(counter)+'.txt', np.transpose([self.wavelengths,np.log10((self.light-self.dark)/(self.currentspec-self.dark)),self.currentspec,self.light,self.dark]),header=header)
+    elif self.mode == 'i':
+      # get time of measurement
+      t = int(time.time())
+      # get measurement number using previous files
+      counter = len(glob.glob(self.name+'*'))
+      # save important information as header
+      header = 'Integration Time:\t'+str(self.integrationtime)+'\n'
+      header = header+'Averages:\t'+str(self.averages)+'\n'
+      header = header+'Unix-Time:\t'+str(t)+'\n\n'
+      header = header+'Wavelength (nm)\tIrradiance\tScope (counts)\tLight (counts)\tDark (counts)'
+      # save all kinds of spectra to file
+      np.savetxt(self.name+'_'+str(counter)+'.txt', np.transpose([self.wavelengths,self.calibration[:,1]*(self.currentspec-self.dark)*1000000/self.integrationtime,self.currentspec,self.light,self.dark]),header=header)
     #close plot, reset mode
     plt.close('all')
     self.mode = ''
@@ -194,11 +245,13 @@ class Measurement:
       self.spectra[-1] = self.spec.intensities()
     except:
       if self.mode == 'd':
-        self.spectra[-1] = np.random.normal(5000,500,1024)
+        self.spectra[-1] = np.random.normal(5000,500,3648)
       elif self.mode == 'l':
-        self.spectra[-1] = np.random.normal(40000,500,1024)
+        self.spectra[-1] = np.random.normal(40000,500,3648)
       elif self.mode == 'a':
-        self.spectra[-1] = np.random.normal(20000,500,1024)
+        self.spectra[-1] = np.random.normal(20000,500,3648)
+      elif self.mode == 'i':
+        self.spectra[-1] = np.random.normal(7000,500,3648)
     self.currentspec = np.mean(np.array(self.spectra), axis=0)
     #self.currentspec = spectrum/self.averages
     if self.darkset:
@@ -211,9 +264,20 @@ class Measurement:
       # for absorbance mode plot absorbance
       self.line[1].set_data(self.wavelengths, np.log10((self.light-self.dark)/(self.currentspec-self.dark)))
     if self.mode == 'i':
-      # todo: irradiance plot
-      pass
+      self.line[1].set_data(self.wavelengths, self.calibration[:,1]*(self.currentspec-self.dark)*1000000/self.integrationtime)
     return self.line,
+
+    def calibrationFilePath(self,filepath):
+      try:
+        self.calibration = np.genfromtxt(filepath)
+      except:
+        print('Error: could not load calibration data')
+
+    def am0FilePath(self,filepath):
+      try:
+        self.am0 = np.genfromtxt(filepath)
+      except:
+        print('Error: could not load AM0 data')
 
 
 #m = Measurement(4000,30)
