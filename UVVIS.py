@@ -38,7 +38,7 @@ class Measurement:
     if t:
       self.integrationtime = t
       print('Integration time set to: ' + str(t))
-    else if auto:
+    elif auto:
       #todo
       print('do auto int time')
     else:
@@ -59,6 +59,7 @@ class Measurement:
     self.ax0.set_title('LIGHT')
     self.anim = ani.FuncAnimation(self.fig, self.animate)
     self.cid = self.fig.canvas.mpl_connect('button_press_event', self.savelight)
+    self.cid = self.fig.canvas.mpl_connect('key_press_event', self.savelight)
     plt.show()
 
   def savelight(self,i):
@@ -94,6 +95,8 @@ class Measurement:
     print('irradiance')
 
   def absorbance(self,name):
+    # set name for correct filename
+    self.name = name
     # generate new figure with two axis for scope and absorbance
     self.fig, (self.ax0, self.ax1) = plt.subplots(2,1,sharex=True)
     # look for previously saved spectra and plot them into the absorbance graph
@@ -110,7 +113,7 @@ class Measurement:
     self.ax0.set_ylim(-1000, 67000)
     self.ax0.set_ylabel('Intensity (count)')
     self.ax0.set_title(name)
-    self.ax1.set_ylim(-0.1, 3.5)
+    self.ax1.set_ylim(-0.1, 2.5)
     self.ax1.set_ylabel('Absorbance')
     self.ax1.set_xlabel('Wavelength (nm)')
     # now start the animation and connect action events
@@ -119,8 +122,6 @@ class Measurement:
     self.cid = self.fig.canvas.mpl_connect('key_press_event', self.saveabsorbance)
     # set absorbance mode so that animation function knows what to plot
     self.mode = 'a'
-    # set name for correct filename
-    self.name = name
     plt.show()
 
   def saveabsorbance(self,i):
