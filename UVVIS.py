@@ -15,6 +15,7 @@ class Measurement:
     self.darkset = False
     self.lightset = False
     self.spectra = []
+    self.interactive = False
     # start up spectrometer
     try:
       self.spec = sb.Spectrometer.from_serial_number()
@@ -187,14 +188,20 @@ class Measurement:
     self.ax1.set_ylim(-0.1, 1.5)
     self.ax1.set_ylabel('Absorbance')
     self.ax1.set_xlabel('Wavelength (nm)')
-    # now start the animation and connect action events
-    self.anim = ani.FuncAnimation(self.fig, self.animate)
-    self.cid = self.fig.canvas.mpl_connect('button_press_event', self.save)
-    self.cid = self.fig.canvas.mpl_connect('key_press_event', self.save)
-    # set absorbance mode so that animation function knows what to plot
-    plt.show()
+    if not self.interactive:
+      # now start the animation and connect action events
+      self.anim = ani.FuncAnimation(self.fig, self.animate)
+      self.cid = self.fig.canvas.mpl_connect('button_press_event', self.save)
+      self.cid = self.fig.canvas.mpl_connect('key_press_event', self.save)
+      # set absorbance mode so that animation function knows what to plot
+      plt.show()
+    else:
+      for i in range(self.averages):
+        self.getSpectrum()
+      self.save()
+    return np.log10((self.light-self.dark)/(self.currentspec-self.dark))
 
-  def save(self,i):
+  def save(self,i=None):
     if self.mode == 'd':
       # set dark
       self.dark = self.currentspec
@@ -233,13 +240,7 @@ class Measurement:
     plt.close('all')
     self.mode = ''
 
-  def animate(self,i):
-    # new empty spectrum
-    #spectrum = np.zeros(len(self.wavelengths))
-    # collect spectra
-    #for k in range(self.averages):
-    #  spectrum = spectrum + self.spec.intensities()
-    # calculate average
+  def getSpectrum(self):
     self.spectra[:-1] = self.spectra[1:]
     try:
       self.spectra[-1] = self.spec.intensities()
@@ -253,6 +254,15 @@ class Measurement:
       elif self.mode == 'i':
         self.spectra[-1] = np.random.normal(7000,500,3648)
     self.currentspec = np.mean(np.array(self.spectra), axis=0)
+
+  def animate(self,i):
+    # new empty spectrum
+    #spectrum = np.zeros(len(self.wavelengths))
+    # collect spectra
+    #for k in range(self.averages):
+    #  spectrum = spectrum + self.spec.intensities()
+    # calculate average
+    self.getSpectrum()
     #self.currentspec = spectrum/self.averages
     if self.darkset:
       # if dark spectrum is set: subtract that
