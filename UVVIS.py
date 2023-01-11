@@ -18,7 +18,7 @@ class Measurement:
     # start up spectrometer
     try:
       self.spec = sb.Spectrometer.from_serial_number()
-      self.spec.integration_time_micros(self.integrationtime)
+      self.spec.integration_time_micros(integrationtime)
       self.wavelengths = self.spec.wavelengths()
       self.currentspec = self.spec.intensities()
       self.dark = self.currentspec
