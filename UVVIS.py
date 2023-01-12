@@ -6,8 +6,8 @@ import time
 import glob
 
 #todo:
-#irradiance
-#setintegrationtime
+#better fake data
+#better init
 
 class Measurement:
   def __init__(self, integrationtime = 4000, averages = 1):
@@ -16,7 +16,6 @@ class Measurement:
     self.lightset = False
     self.spectra = []
     self.liveplot = True
-    self.autosave = True
     # start up spectrometer
     try:
       self.spec = sb.Spectrometer.from_serial_number()
@@ -24,7 +23,7 @@ class Measurement:
       self.wavelengths = self.spec.wavelengths()
       self.currentspec = self.spec.intensities()
       self.dark = self.currentspec
-      self.light = self.currentspec
+      self.light = self.curre,ntspec
     except:
       print('Error starting spectrometer')
       # generate some fake data anyways
@@ -86,7 +85,7 @@ class Measurement:
     self.startMeasurement()
     return self.currentspec
 
-  def scope(self,name):
+  def scope(self,name=None):
     self.mode = 's'
     # set name for correct filename
     self.name = name
@@ -95,14 +94,14 @@ class Measurement:
       return self.currentspec-self.dark
     return self.currentspec
 
-  def irradiance(self,name):
+  def irradiance(self,name=None):
     self.mode = 'i'
     # set name for correct filename
     self.name = name
     self.startMeasurement()
     return self.calibration[:,1]*(self.currentspec-self.dark)*1000000/self.integrationtime
 
-  def absorbance(self,name):
+  def absorbance(self,name=None):
     self.mode = 'a'
     # set name for correct filename
     self.name = name
@@ -124,16 +123,17 @@ class Measurement:
       else:
         self.fig, self.ax0 = plt.subplots(1,1)
       # look for previously saved spectra and plot them into the absorbance graph
-      previous = glob.glob(self.name+'*')
-      for measurement in previous:
-        m = np.genfromtxt(measurement)
-        if self.mode == 'a' or self.mode == 'i':
-          self.ax1.plot(m[:,0], m[:,1], lw=1, alpha=0.3, color='black')
-        elif self.mode == 's':
-          if len(m[0,:]) == 3:
-            self.ax0.plot(m[:,0], m[:,1]-m[:,2], lw=1, alpha=0.3, color='black')
-          else:
-            self.ax0.plot(m[:,0], m[:,1], lw=1, alpha=0.3, color='black')
+      if self.name:
+        previous = glob.glob(self.name+'*')
+        for measurement in previous:
+          m = np.genfromtxt(measurement)
+          if self.mode == 'a' or self.mode == 'i':
+            self.ax1.plot(m[:,0], m[:,1], lw=1, alpha=0.3, color='black')
+          elif self.mode == 's':
+            if len(m[0,:]) == 3:
+              self.ax0.plot(m[:,0], m[:,1]-m[:,2], lw=1, alpha=0.3, color='black')
+            else:
+              self.ax0.plot(m[:,0], m[:,1], lw=1, alpha=0.3, color='black')
       # plot empty lines for live plotting
       self.line0, = self.ax0.plot([], [], lw=1)
       if self.mode == 'a' or self.mode == 'i':
@@ -155,7 +155,8 @@ class Measurement:
         self.ax1.set_xlabel('Wavelength (nm)')
       else:
         self.ax0.set_xlabel('Wavelength (nm)')
-      self.ax0.set_title(self.name)
+      if self.name:
+        self.ax0.set_title(self.name)
       # now start the animation and connect action events
       self.anim = ani.FuncAnimation(self.fig, self.animate)
       self.cid = self.fig.canvas.mpl_connect('button_press_event', self.save)
@@ -178,7 +179,7 @@ class Measurement:
       self.light = self.currentspec
       self.lightset = True
       print('light set')
-    elif self.mode == 'a' and self.autosave:
+    elif self.mode == 'a' and self.name:
       # get time of measurement
       t = int(time.time())
       # get measurement number using previous files
@@ -190,7 +191,7 @@ class Measurement:
       header = header+'Wavelength (nm)\tAbsorbance\tScope (counts)\tLight (counts)\tDark (counts)'
       # save all kinds of spectra to file
       np.savetxt(self.name+'_'+str(counter)+'.txt', np.transpose([self.wavelengths,np.log10((self.light-self.dark)/(self.currentspec-self.dark)),self.currentspec,self.light,self.dark]),header=header)
-    elif self.mode == 'i' and self.autosave:
+    elif self.mode == 'i' and self.name:
       # get time of measurement
       t = int(time.time())
       # get measurement number using previous files
@@ -202,7 +203,7 @@ class Measurement:
       header = header+'Wavelength (nm)\tIrradiance\tScope (counts)\tDark (counts)'
       # save all kinds of spectra to file
       np.savetxt(self.name+'_'+str(counter)+'.txt', np.transpose([self.wavelengths,self.calibration[:,1]*(self.currentspec-self.dark)*1000000/self.integrationtime,self.currentspec,self.dark]),header=header)
-    elif self.mode == 's' and self.autosave:
+    elif self.mode == 's' and self.name:
       # get time of measurement
       t = int(time.time())
       # get measurement number using previous files
