@@ -5,32 +5,23 @@ import seabreeze.spectrometers as sb
 import time
 import glob
 
-#todo:
-#better fake data
-#better init
-
 class Measurement:
   def __init__(self, integrationtime = 4000, averages = 1):
     # state variables to know in case integration time or averages changes
     self.darkset = False
     self.lightset = False
-    self.spectra = []
     self.liveplot = True
+    self.mode = ''
     # start up spectrometer
     try:
       self.spec = sb.Spectrometer.from_serial_number()
       self.spec.integration_time_micros(integrationtime)
-      self.wavelengths = self.spec.wavelengths()
       self.currentspec = self.spec.intensities()
-      self.dark = self.currentspec
-      self.light = self.curre,ntspec
+      self.wavelengths = self.spec.wavelengths()
     except:
-      print('Error starting spectrometer')
-      # generate some fake data anyways
+      print('Error initializing spectrometer')
+      self.currentspec = np.random.normal(5000,500,3648)
       self.wavelengths = np.linspace(200,1000,3648)
-      self.currentspec = np.random.normal(5000,50,3648)
-      self.dark = self.currentspec
-      self.light = self.currentspec
     try:
       self.calibration = np.genfromtxt('flame_calibration.txt')
     except:
@@ -39,16 +30,17 @@ class Measurement:
       self.am0 = np.genfromtxt('AM0.tsv')
     except:
       print('Error: could not load AM0 data')
-    self.setintegrationtime(integrationtime)
+    self.dark = self.currentspec
+    self.light = self.currentspec
     self.setaverages(averages)
-    self.mode = ''
+    self.setintegrationtime(integrationtime)
 
   def setaverages(self,n):
     self.averages = n
     # fill spectra safe
     self.spectra = []
     for i in range(self.averages):
-      self.spectra.append(self.light)
+      self.spectra.append(self.currentspec)
     self.darkset = False
     self.lightset = False
     print('Averages set to: ' + str(n))
@@ -228,16 +220,23 @@ class Measurement:
     self.spectra[:-1] = self.spectra[1:]
     try:
       self.spectra[-1] = self.spec.intensities()
+      self.wavelengths = self.spec.wavelengths()
     except:
       if self.mode == 'd':
         self.spectra[-1] = np.random.normal(5000,500,3648)
       elif self.mode == 'l':
-        self.spectra[-1] = np.random.normal(40000,500,3648)
+        self.spectra[-1] = np.random.normal(5000,500,3648) + 5e4*self.gauss(np.linspace(200,1000,3648),600,120)
       elif self.mode == 'a':
-        self.spectra[-1] = np.random.normal(20000,500,3648)
+        self.spectra[-1] = np.random.normal(5000,500,3648) + 5e4*self.gauss(np.linspace(200,1000,3648),600,120) - 2e4*self.gauss(np.linspace(200,1000,3648),500,20)
       elif self.mode == 'i':
-        self.spectra[-1] = np.random.normal(7000,500,3648)
+        self.spectra[-1] = np.random.normal(5000,500,3648) + 5e4*self.gauss(np.linspace(200,1000,3648),600,120)
+      else:
+        self.spectra[-1] = np.random.normal(5000,500,3648) + 5e4*self.gauss(np.linspace(200,1000,3648),600,120)
+      self.wavelengths = np.linspace(200,1000,3648)
     self.currentspec = np.mean(np.array(self.spectra), axis=0)
+
+  def gauss(self,wl,b,c):
+    return np.exp(-(wl-b)**2/(2*(c)**2))
 
   def animate(self,i):
     # new empty spectrum
