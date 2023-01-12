@@ -5,6 +5,9 @@ import seabreeze.spectrometers as sb
 import time
 import glob
 
+plt.rcParams["figure.figsize"] = [14, 9]
+np.seterr(invalid='ignore')
+
 class Measurement:
   def __init__(self, integrationtime = 4000, averages = 1):
     # state variables to know in case integration time or averages changes
@@ -182,7 +185,7 @@ class Measurement:
       header = header+'Unix-Time:\t'+str(t)+'\n\n'
       header = header+'Wavelength (nm)\tAbsorbance\tScope (counts)\tLight (counts)\tDark (counts)'
       # save all kinds of spectra to file
-      np.savetxt(self.name+'_'+str(counter)+'.txt', np.transpose([self.wavelengths,np.log10((self.light-self.dark)/(self.currentspec-self.dark)),self.currentspec,self.light,self.dark]),header=header)
+      np.savetxt(self.name+'_'+str(counter).zfill(4)+'.txt', np.transpose([self.wavelengths,np.log10((self.light-self.dark)/(self.currentspec-self.dark)),self.currentspec,self.light,self.dark]),header=header)
     elif self.mode == 'i' and self.name:
       # get time of measurement
       t = int(time.time())
@@ -194,7 +197,7 @@ class Measurement:
       header = header+'Unix-Time:\t'+str(t)+'\n\n'
       header = header+'Wavelength (nm)\tIrradiance\tScope (counts)\tDark (counts)'
       # save all kinds of spectra to file
-      np.savetxt(self.name+'_'+str(counter)+'.txt', np.transpose([self.wavelengths,self.calibration[:,1]*(self.currentspec-self.dark)*1000000/self.integrationtime,self.currentspec,self.dark]),header=header)
+      np.savetxt(self.name+'_'+str(counter).zfill(4)+'.txt', np.transpose([self.wavelengths,self.calibration[:,1]*(self.currentspec-self.dark)*1000000/self.integrationtime,self.currentspec,self.dark]),header=header)
     elif self.mode == 's' and self.name:
       # get time of measurement
       t = int(time.time())
@@ -207,11 +210,11 @@ class Measurement:
       if self.darkset:
         header = header+'Wavelength (nm)\tScope (counts)\tDark (counts)'
         # save all kinds of spectra to file
-        np.savetxt(self.name+'_'+str(counter)+'.txt', np.transpose([self.wavelengths,self.currentspec,self.dark]),header=header)
+        np.savetxt(self.name+'_'+str(counter).zfill(4)+'.txt', np.transpose([self.wavelengths,self.currentspec,self.dark]),header=header)
       else:
         header = header+'Wavelength (nm)\tScope (counts)'
         # save all kinds of spectra to file
-        np.savetxt(self.name+'_'+str(counter)+'.txt', np.transpose([self.wavelengths,self.currentspec]),header=header)
+        np.savetxt(self.name+'_'+str(counter).zfill(4)+'.txt', np.transpose([self.wavelengths,self.currentspec]),header=header)
     #close plot, reset mode
     plt.close('all')
     self.mode = ''
