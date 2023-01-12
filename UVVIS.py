@@ -16,6 +16,7 @@ class Measurement:
     self.lightset = False
     self.spectra = []
     self.liveplot = True
+    self.autosave = True
     # start up spectrometer
     try:
       self.spec = sb.Spectrometer.from_serial_number()
@@ -129,7 +130,10 @@ class Measurement:
         if self.mode == 'a' or self.mode == 'i':
           self.ax1.plot(m[:,0], m[:,1], lw=1, alpha=0.3, color='black')
         elif self.mode == 's':
-          self.ax0.plot(m[:,0], m[:,1], lw=1, alpha=0.3, color='black')
+          if len(m[0,:]) == 3:
+            self.ax0.plot(m[:,0], m[:,1]-m[:,2], lw=1, alpha=0.3, color='black')
+          else:
+            self.ax0.plot(m[:,0], m[:,1], lw=1, alpha=0.3, color='black')
       # plot empty lines for live plotting
       self.line0, = self.ax0.plot([], [], lw=1)
       if self.mode == 'a' or self.mode == 'i':
@@ -174,7 +178,7 @@ class Measurement:
       self.light = self.currentspec
       self.lightset = True
       print('light set')
-    elif self.mode == 'a':
+    elif self.mode == 'a' and self.autosave:
       # get time of measurement
       t = int(time.time())
       # get measurement number using previous files
@@ -186,7 +190,7 @@ class Measurement:
       header = header+'Wavelength (nm)\tAbsorbance\tScope (counts)\tLight (counts)\tDark (counts)'
       # save all kinds of spectra to file
       np.savetxt(self.name+'_'+str(counter)+'.txt', np.transpose([self.wavelengths,np.log10((self.light-self.dark)/(self.currentspec-self.dark)),self.currentspec,self.light,self.dark]),header=header)
-    elif self.mode == 'i':
+    elif self.mode == 'i' and self.autosave:
       # get time of measurement
       t = int(time.time())
       # get measurement number using previous files
@@ -198,7 +202,7 @@ class Measurement:
       header = header+'Wavelength (nm)\tIrradiance\tScope (counts)\tDark (counts)'
       # save all kinds of spectra to file
       np.savetxt(self.name+'_'+str(counter)+'.txt', np.transpose([self.wavelengths,self.calibration[:,1]*(self.currentspec-self.dark)*1000000/self.integrationtime,self.currentspec,self.dark]),header=header)
-    elif self.mode == 's':
+    elif self.mode == 's' and self.autosave:
       # get time of measurement
       t = int(time.time())
       # get measurement number using previous files
@@ -210,11 +214,11 @@ class Measurement:
       if self.darkset:
         header = header+'Wavelength (nm)\tScope (counts)\tDark (counts)'
         # save all kinds of spectra to file
-        np.savetxt(self.name+'_'+str(counter)+'.txt', np.transpose([self.wavelengths,self.currentspec,self.currentspec,self.dark]),header=header)
-      if self.darkset:
+        np.savetxt(self.name+'_'+str(counter)+'.txt', np.transpose([self.wavelengths,self.currentspec,self.dark]),header=header)
+      else:
         header = header+'Wavelength (nm)\tScope (counts)'
         # save all kinds of spectra to file
-        np.savetxt(self.name+'_'+str(counter)+'.txt', np.transpose([self.wavelengths,self.currentspec,self.currentspec]),header=header)
+        np.savetxt(self.name+'_'+str(counter)+'.txt', np.transpose([self.wavelengths,self.currentspec]),header=header)
     #close plot, reset mode
     plt.close('all')
     self.mode = ''
@@ -267,10 +271,3 @@ class Measurement:
       self.am0 = np.genfromtxt(filepath)
     except:
       print('Error: could not load AM0 data')
-
-
-m = Measurement(4000,30)
-m.setlight()
-m.setdark()
-m.liveplot = False
-m.scope('test')
