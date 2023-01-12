@@ -15,7 +15,7 @@ class Measurement:
     self.darkset = False
     self.lightset = False
     self.spectra = []
-    self.interactive = False
+    self.liveplot = True
     # start up spectrometer
     try:
       self.spec = sb.Spectrometer.from_serial_number()
@@ -73,122 +73,85 @@ class Measurement:
     self.darkset = False
     self.lightset = False
 
-  def scope(self):
-    # generate a plot to set the light spectrum with just the scope
-    self.fig, (self.ax0) = plt.subplots(1,1)
-    # generate empty line for live plotting
-    self.line0, = self.ax0.plot([], [], lw=1)
-    self.line = [self.line0]
-    # aesthetics ...
-    self.ax0.set_xlim(min(self.wavelengths),max(self.wavelengths))
-    self.ax0.set_ylim(-1000, 67000)
-    self.ax0.set_ylabel('Intensity (count)')
-    self.ax0.set_xlabel('Wavelength (nm)')
-    self.ax0.set_title('SCOPE')
-    self.anim = ani.FuncAnimation(self.fig, self.animate)
-    plt.show()
-
   def setlight(self):
     self.mode = 'l'
-    # generate a plot to set the light spectrum with just the scope
-    self.fig, (self.ax0) = plt.subplots(1,1)
-    # generate empty line for live plotting
-    self.line0, = self.ax0.plot([], [], lw=1)
-    self.line = [self.line0]
-    # aesthetics ...
-    self.ax0.set_xlim(min(self.wavelengths),max(self.wavelengths))
-    self.ax0.set_ylim(-1000, 67000)
-    self.ax0.set_ylabel('Intensity (count)')
-    self.ax0.set_xlabel('Wavelength (nm)')
-    self.ax0.set_title('LIGHT')
-    self.anim = ani.FuncAnimation(self.fig, self.animate)
-    self.cid = self.fig.canvas.mpl_connect('button_press_event', self.save)
-    self.cid = self.fig.canvas.mpl_connect('key_press_event', self.save)
-    plt.show()
+    self.name = 'LIGHT'
+    self.startMeasurement()
+    return self.currentspec
 
   def setdark(self):
     self.mode = 'd'
-    self.fig, (self.ax0) = plt.subplots(1,1)
-    self.line0, = self.ax0.plot([], [], lw=1)
-    self.line = [self.line0]
-    self.ax0.set_xlim(min(self.wavelengths),max(self.wavelengths))
-    self.ax0.set_ylim(-1000, 67000)
-    self.ax0.set_ylabel('Intensity (count)')
-    self.ax0.set_xlabel('Wavelength (nm)')
-    self.ax0.set_title('DARK')
-    # now start the animation and connect action events
-    self.anim = ani.FuncAnimation(self.fig, self.animate)
-    self.cid = self.fig.canvas.mpl_connect('button_press_event', self.save)
-    self.cid = self.fig.canvas.mpl_connect('key_press_event', self.save)
-    plt.show()
+    self.name = 'DARK'
+    self.startMeasurement()
+    return self.currentspec
+
+  def scope(self,name):
+    self.mode = 's'
+    # set name for correct filename
+    self.name = name
+    self.startMeasurement()
+    if self.darkset:
+      return self.currentspec-self.dark
+    return self.currentspec
 
   def irradiance(self,name):
-    # check if dark is set, else warn and break execution
-    if not self.darkset:
-      print('Dark Spectrum is not set')
-      return
     self.mode = 'i'
     # set name for correct filename
     self.name = name
-    # generate new figure with two axis for scope and absorbance
-    self.fig, (self.ax0, self.ax1) = plt.subplots(2,1,sharex=True)
-    #plot am0
-    self.ax1.plot(self.am0[:,0]*1000, self.am0[:,1]/1000, lw=1, alpha=0.6, color='orange')
-    # look for previously saved spectra and plot them into the absorbance graph
-    previous = glob.glob(self.name+'*')
-    for measurement in previous:
-      m = np.genfromtxt(measurement)
-      self.ax1.plot(m[:,0], m[:,1], lw=1, alpha=0.3, color='black')
-    # plot empty lines for live plotting
-    self.line0, = self.ax0.plot([], [], lw=1)
-    self.line1, = self.ax1.plot([], [], lw=1)
-    self.line = [self.line0, self.line1]
-    # some aesthetics ...
-    self.ax0.set_xlim(min(self.wavelengths),max(self.wavelengths))
-    self.ax0.set_ylim(-1000, 67000)
-    self.ax0.set_ylabel('Intensity (count)')
-    self.ax0.set_title(name)
-    self.ax1.set_ylim(-0.3, 2.3)
-    self.ax1.set_ylabel('Irradiance (W/m$^2$/nm)')
-    self.ax1.set_xlabel('Wavelength (nm)')
-    # now start the animation and connect action events
-    self.anim = ani.FuncAnimation(self.fig, self.animate)
-    self.cid = self.fig.canvas.mpl_connect('button_press_event', self.save)
-    self.cid = self.fig.canvas.mpl_connect('key_press_event', self.save)
-    # set absorbance mode so that animation function knows what to plot
-    plt.show()
+    self.startMeasurement()
+    return self.calibration[:,1]*(self.currentspec-self.dark)*1000000/self.integrationtime
 
   def absorbance(self,name):
-    # check if dark and light are set, else warn and break execution
-    if not self.darkset:
-      print('Dark Spectrum is not set')
-      return
-    if not self.lightset:
-      print('Light Spectrum is not set')
-      return
     self.mode = 'a'
     # set name for correct filename
     self.name = name
-    # generate new figure with two axis for scope and absorbance
-    self.fig, (self.ax0, self.ax1) = plt.subplots(2,1,sharex=True)
-    # look for previously saved spectra and plot them into the absorbance graph
-    previous = glob.glob(self.name+'*')
-    for measurement in previous:
-      m = np.genfromtxt(measurement)
-      self.ax1.plot(m[:,0], m[:,1], lw=1, alpha=0.3, color='black')
-    # plot empty lines for live plotting
-    self.line0, = self.ax0.plot([], [], lw=1)
-    self.line1, = self.ax1.plot([], [], lw=1)
-    self.line = [self.line0, self.line1]
-    # some aesthetics ...
-    self.ax0.set_xlim(min(self.wavelengths),max(self.wavelengths))
-    self.ax0.set_ylim(-1000, 67000)
-    self.ax0.set_ylabel('Intensity (count)')
-    self.ax0.set_title(name)
-    self.ax1.set_ylim(-0.1, 1.5)
-    self.ax1.set_ylabel('Absorbance')
-    self.ax1.set_xlabel('Wavelength (nm)')
-    if not self.interactive:
+    self.startMeasurement()
+    return np.log10((self.light-self.dark)/(self.currentspec-self.dark))
+
+  def startMeasurement(self):
+    # check if dark and light are set, else warn and break execution
+    if (self.mode == 'a' or self.mode == 'i') and not self.darkset:
+      print('Dark Spectrum is not set')
+      return
+    if self.mode == 'a' and not self.lightset:
+      print('Light Spectrum is not set')
+      return
+    if self.liveplot:
+      if self.mode == 'a' or self.mode == 'i':
+        # generate new figure with two axis for scope and absorbance
+        self.fig, (self.ax0, self.ax1) = plt.subplots(2,1,sharex=True)
+      else:
+        self.fig, self.ax0 = plt.subplots(1,1)
+      # look for previously saved spectra and plot them into the absorbance graph
+      previous = glob.glob(self.name+'*')
+      for measurement in previous:
+        m = np.genfromtxt(measurement)
+        if self.mode == 'a' or self.mode == 'i':
+          self.ax1.plot(m[:,0], m[:,1], lw=1, alpha=0.3, color='black')
+        elif self.mode == 's':
+          self.ax0.plot(m[:,0], m[:,1], lw=1, alpha=0.3, color='black')
+      # plot empty lines for live plotting
+      self.line0, = self.ax0.plot([], [], lw=1)
+      if self.mode == 'a' or self.mode == 'i':
+        self.line1, = self.ax1.plot([], [], lw=1)
+        self.line = [self.line0, self.line1]
+      else:
+        self.line = [self.line0,]
+      # some aesthetics ...
+      self.ax0.set_xlim(min(self.wavelengths),max(self.wavelengths))
+      self.ax0.set_ylim(-1000, 67000)
+      self.ax0.set_ylabel('Intensity (count)')
+      if self.mode == 'a':
+        self.ax1.set_ylim(-0.1, 1.5)
+        self.ax1.set_ylabel('Absorbance')
+        self.ax1.set_xlabel('Wavelength (nm)')
+      elif self.mode == 'i':
+        self.ax1.set_ylim(-0.3, 2.3)
+        self.ax1.set_ylabel('Irradiance (W/m$^2$/nm)')
+        self.ax1.set_xlabel('Wavelength (nm)')
+      else:
+        self.ax0.set_xlabel('Wavelength (nm)')
+      self.ax0.set_title(self.name)
       # now start the animation and connect action events
       self.anim = ani.FuncAnimation(self.fig, self.animate)
       self.cid = self.fig.canvas.mpl_connect('button_press_event', self.save)
@@ -199,7 +162,6 @@ class Measurement:
       for i in range(self.averages):
         self.getSpectrum()
       self.save()
-    return np.log10((self.light-self.dark)/(self.currentspec-self.dark))
 
   def save(self,i=None):
     if self.mode == 'd':
@@ -233,9 +195,26 @@ class Measurement:
       header = 'Integration Time:\t'+str(self.integrationtime)+'\n'
       header = header+'Averages:\t'+str(self.averages)+'\n'
       header = header+'Unix-Time:\t'+str(t)+'\n\n'
-      header = header+'Wavelength (nm)\tIrradiance\tScope (counts)\tLight (counts)\tDark (counts)'
+      header = header+'Wavelength (nm)\tIrradiance\tScope (counts)\tDark (counts)'
       # save all kinds of spectra to file
-      np.savetxt(self.name+'_'+str(counter)+'.txt', np.transpose([self.wavelengths,self.calibration[:,1]*(self.currentspec-self.dark)*1000000/self.integrationtime,self.currentspec,self.light,self.dark]),header=header)
+      np.savetxt(self.name+'_'+str(counter)+'.txt', np.transpose([self.wavelengths,self.calibration[:,1]*(self.currentspec-self.dark)*1000000/self.integrationtime,self.currentspec,self.dark]),header=header)
+    elif self.mode == 's':
+      # get time of measurement
+      t = int(time.time())
+      # get measurement number using previous files
+      counter = len(glob.glob(self.name+'*'))
+      # save important information as header
+      header = 'Integration Time:\t'+str(self.integrationtime)+'\n'
+      header = header+'Averages:\t'+str(self.averages)+'\n'
+      header = header+'Unix-Time:\t'+str(t)+'\n\n'
+      if self.darkset:
+        header = header+'Wavelength (nm)\tScope (counts)\tDark (counts)'
+        # save all kinds of spectra to file
+        np.savetxt(self.name+'_'+str(counter)+'.txt', np.transpose([self.wavelengths,self.currentspec,self.currentspec,self.dark]),header=header)
+      if self.darkset:
+        header = header+'Wavelength (nm)\tScope (counts)'
+        # save all kinds of spectra to file
+        np.savetxt(self.name+'_'+str(counter)+'.txt', np.transpose([self.wavelengths,self.currentspec,self.currentspec]),header=header)
     #close plot, reset mode
     plt.close('all')
     self.mode = ''
@@ -277,22 +256,21 @@ class Measurement:
       self.line[1].set_data(self.wavelengths, self.calibration[:,1]*(self.currentspec-self.dark)*1000000/self.integrationtime)
     return self.line,
 
-    def calibrationFilePath(self,filepath):
-      try:
-        self.calibration = np.genfromtxt(filepath)
-      except:
-        print('Error: could not load calibration data')
+  def calibrationFilePath(self,filepath):
+    try:
+      self.calibration = np.genfromtxt(filepath)
+    except:
+      print('Error: could not load calibration data')
 
-    def am0FilePath(self,filepath):
-      try:
-        self.am0 = np.genfromtxt(filepath)
-      except:
-        print('Error: could not load AM0 data')
+  def am0FilePath(self,filepath):
+    try:
+      self.am0 = np.genfromtxt(filepath)
+    except:
+      print('Error: could not load AM0 data')
 
 
-#m = Measurement(4000,30)
-#m.setlight()
-#m.setdark()
-#windows = ['1_30nm','2_15nm','3_5nm']
-#for window in windows:
-#  m.absorbance(window)
+m = Measurement(4000,30)
+m.setlight()
+m.setdark()
+m.liveplot = False
+m.scope('test')
