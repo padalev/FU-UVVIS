@@ -18,6 +18,7 @@ class Measurement:
     self.liveplot = True
     self.times = []
     self.timesspec = []
+    self.group = 1
     self.mode = ''
     # start up spectrometer
     try:
@@ -160,6 +161,13 @@ class Measurement:
         self.ax0.set_title(self.name + ' #' + str(counter))
       elif self.name:
         self.ax0.set_title(self.name)
+      # matplotlib takes 0.2 seconds to plot (windoof & raspberry pi 4), so a running average may be very slow
+      # e.g. 30 avergaes * 0.2s = 6s (!)
+      # so we take N measurements in a group to save plot time so that N*integrationtime ~ 0.02s (10% of plot time)
+      # e.g. N = goaltime/integrationtime = 0.02s/0.004s = 5
+      # however never wait longer than given number of averages
+      # also dont go below 1 :)
+      self.group = int(max([min([2e4/self.integrationtime,self.averages]),1]))
       # now start the animation and connect action events
       self.last = time.time()
       self.anim = ani.FuncAnimation(self.fig, self.animate)
@@ -171,7 +179,7 @@ class Measurement:
         plt.plot(self.times)
         plt.plot(self.timesspec)
         plt.show()
-        print(self.times)
+        print(self.group)
     else:
       for i in range(self.averages):
         self.getSpectrum()
@@ -256,15 +264,12 @@ class Measurement:
     return np.exp(-(wl-b)**2/(2*(c)**2))
 
   def animate(self,i):
-    # new empty spectrum
-    #spectrum = np.zeros(len(self.wavelengths))
-    # collect spectra
-    #for k in range(self.averages):
-    #  spectrum = spectrum + self.spec.intensities()
-    # calculate average
+    # timekeeping for debugging
     new = time.time()
     self.times.append(new-self.last)
-    self.getSpectrum()
+    # group measurements to save plot time (see above)
+    for i in range(self.group):
+      self.getSpectrum()
     self.timesspec.append(time.time()-new)
     #self.currentspec = spectrum/self.averages
     if self.darkset:
