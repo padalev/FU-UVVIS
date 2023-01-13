@@ -7,13 +7,17 @@ import glob
 
 plt.rcParams["figure.figsize"] = [14, 9]
 np.seterr(invalid='ignore')
+np.seterr(divide='ignore')
 
 class Measurement:
   def __init__(self, integrationtime = 4000, averages = 1):
     # state variables to know in case integration time or averages changes
+    self.debug = False
     self.darkset = False
     self.lightset = False
     self.liveplot = True
+    self.times = []
+    self.timesspec = []
     self.mode = ''
     # start up spectrometer
     try:
@@ -112,6 +116,8 @@ class Measurement:
       print('Light Spectrum is not set')
       return
     if self.liveplot:
+      # get measurement number using previous files
+      counter = len(glob.glob(self.name+'*'))
       if self.mode == 'a' or self.mode == 'i':
         # generate new figure with two axis for scope and absorbance
         self.fig, (self.ax0, self.ax1) = plt.subplots(2,1,sharex=True)
@@ -150,14 +156,22 @@ class Measurement:
         self.ax1.set_xlabel('Wavelength (nm)')
       else:
         self.ax0.set_xlabel('Wavelength (nm)')
-      if self.name:
+      if self.name and (self.mode == 'a' or self.mode == 'i'):
+        self.ax0.set_title(self.name + ' #' + str(counter))
+      elif self.name:
         self.ax0.set_title(self.name)
       # now start the animation and connect action events
+      self.last = time.time()
       self.anim = ani.FuncAnimation(self.fig, self.animate)
       self.cid = self.fig.canvas.mpl_connect('button_press_event', self.save)
       self.cid = self.fig.canvas.mpl_connect('key_press_event', self.save)
       # set absorbance mode so that animation function knows what to plot
       plt.show()
+      if self.debug:
+        plt.plot(self.times)
+        plt.plot(self.timesspec)
+        plt.show()
+        print(self.times)
     else:
       for i in range(self.averages):
         self.getSpectrum()
@@ -248,7 +262,10 @@ class Measurement:
     #for k in range(self.averages):
     #  spectrum = spectrum + self.spec.intensities()
     # calculate average
+    new = time.time()
+    self.times.append(new-self.last)
     self.getSpectrum()
+    self.timesspec.append(time.time()-new)
     #self.currentspec = spectrum/self.averages
     if self.darkset:
       # if dark spectrum is set: subtract that
@@ -261,6 +278,7 @@ class Measurement:
       self.line[1].set_data(self.wavelengths, np.log10((self.light-self.dark)/(self.currentspec-self.dark)))
     if self.mode == 'i':
       self.line[1].set_data(self.wavelengths, self.calibration[:,1]*(self.currentspec-self.dark)*1000000/self.integrationtime)
+    self.last = new
     return self.line,
 
   def calibrationFilePath(self,filepath):
