@@ -117,8 +117,6 @@ class Measurement:
       print('Light Spectrum is not set')
       return
     if self.liveplot:
-      # get measurement number using previous files
-      counter = len(glob.glob(self.name+'*'))
       if self.mode == 'a' or self.mode == 'i':
         # generate new figure with two axis for scope and absorbance
         self.fig, (self.ax0, self.ax1) = plt.subplots(2,1,sharex=True)
@@ -129,13 +127,18 @@ class Measurement:
         previous = glob.glob(self.name+'*')
         for measurement in previous:
           m = np.genfromtxt(measurement)
-          if self.mode == 'a' or self.mode == 'i':
+          if self.mode == 'a':
             self.ax1.plot(m[:,0], m[:,1], lw=1, alpha=0.3, color='black')
+            self.ax0.plot(m[:,0], m[:,2]-m[:,4], lw=1, alpha=0.3, color='black')
+          if self.mode == 'i':
+            self.ax1.plot(m[:,0], m[:,1], lw=1, alpha=0.3, color='black')
+            self.ax0.plot(m[:,0], m[:,2]-m[:,3], lw=1, alpha=0.3, color='black')
           elif self.mode == 's':
             if len(m[0,:]) == 3:
               self.ax0.plot(m[:,0], m[:,1]-m[:,2], lw=1, alpha=0.3, color='black')
             else:
               self.ax0.plot(m[:,0], m[:,1], lw=1, alpha=0.3, color='black')
+
       # plot empty lines for live plotting
       self.line0, = self.ax0.plot([], [], lw=1)
       if self.mode == 'a' or self.mode == 'i':
@@ -148,7 +151,7 @@ class Measurement:
       self.ax0.set_ylim(-1000, 67000)
       self.ax0.set_ylabel('Intensity (count)')
       if self.mode == 'a':
-        self.ax1.set_ylim(-0.1, 1.5)
+        self.ax1.set_ylim(-0.1, 2.0)
         self.ax1.set_ylabel('Absorbance')
         self.ax1.set_xlabel('Wavelength (nm)')
       elif self.mode == 'i':
@@ -158,6 +161,8 @@ class Measurement:
       else:
         self.ax0.set_xlabel('Wavelength (nm)')
       if self.name and (self.mode == 'a' or self.mode == 'i'):
+        # get measurement number using previous files
+        counter = len(glob.glob(self.name+'*'))
         self.ax0.set_title(self.name + ' #' + str(counter))
       elif self.name:
         self.ax0.set_title(self.name)
@@ -166,14 +171,13 @@ class Measurement:
       # so we take N measurements in a group to save plot time so that N*integrationtime ~ 0.02s (10% of plot time)
       # e.g. N = goaltime/integrationtime = 0.02s/0.004s = 5
       # however never wait longer than given number of averages
-      # also dont go below 1 :)
+      # also don't go below 1 :)
       self.group = int(max([min([2e4/self.integrationtime,self.averages]),1]))
       # now start the animation and connect action events
       self.last = time.time()
       self.anim = ani.FuncAnimation(self.fig, self.animate)
       self.cid = self.fig.canvas.mpl_connect('button_press_event', self.save)
       self.cid = self.fig.canvas.mpl_connect('key_press_event', self.save)
-      # set absorbance mode so that animation function knows what to plot
       plt.show()
       if self.debug:
         plt.plot(self.times)
